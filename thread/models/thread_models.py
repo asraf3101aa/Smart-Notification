@@ -7,17 +7,18 @@ User = get_user_model()
 class Thread(models.Model):
     title = models.CharField(
         validators=[
-            MinLengthValidator(5),
+            MinLengthValidator(3),
             MaxLengthValidator(100)
         ]
     )
     description = models.TextField(
         validators=[
-            MinLengthValidator(10),
+            MinLengthValidator(5),
             MaxLengthValidator(300)
         ]
     )    
     created_by = models.ForeignKey(User, related_name='threads', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_deleted = models.BooleanField(default=False)
+    subscribers = models.ManyToManyField(User, related_name="thread_subscriptions")
+
