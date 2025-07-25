@@ -9,10 +9,12 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+from datetime import timedelta
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
+from celery.schedules import crontab
 
 # loads the configs from .env
 load_dotenv()
@@ -45,6 +47,7 @@ INSTALLED_APPS = [
     # Installed apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'phonenumber_field',
 
     # User creted apps
     'v1',
@@ -147,5 +150,57 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1/minute'
+    }
 }
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(
+        hours=int(os.environ.get('ACCESS_TOKEN_LIFETIME_MINUTES', 1))
+    ),
+    'REFRESH_TOKEN_LIFETIME': timedelta(
+        days=int(os.environ.get('REFRESH_TOKEN_LIFETIME_DAYS', 7))
+    ),
+}
+
+#RabbitMQ as the message broker
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
+
+# Celery Beat
+
+report_day = os.environ.get('WEEKLY_REPORT_DAY', 'friday').lower()
+report_hour = int(os.environ.get('WEEKLY_REPORT_HOUR', 8))
+report_minute = int(os.environ.get('WEEKLY_REPORT_MINUTE', 9))
+
+DAYS_MAP = {
+    'sunday': 6,
+    'monday': 0,
+    'tuesday': 1,
+    'wednesday': 2,
+    'thursday': 3,
+    'friday': 4,
+    'saturday': 5,
+}
+
+day_of_week = DAYS_MAP.get(report_day, 5)
+
+CELERY_BEAT_SCHEDULE = {
+    'send_weekly_report': {
+        'task': 'v1.notification.tasks.summary_report',
+        'schedule': crontab(minute=report_minute, hour=report_hour, day_of_week=day_of_week),
+    },
+}
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend' 
+DEFAULT_EMAIL_SENDER=os.getenv('DEFAULT_EMAIL_SENDER', 'smartnotification@gmail.com')
+
+# SMS settings
+SMS_BACKEND = 'sms.backends.console.SmsBackend'
+DEFAULT_SMS_SENDER=os.getenv('DEFAULT_SMS_SENDER', '+9779865523234')
